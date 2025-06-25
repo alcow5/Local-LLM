@@ -56,10 +56,28 @@ ollama serve &
 
 ---
 
-### 5. Install Open WebUI (Docker Recommended)
+### 5. Install Open WebUI with Docker Compose
+Create a `docker-compose.yml` file:
+
+```yaml
+version: "3"
+services:
+  webui:
+    image: ghcr.io/open-webui/open-webui:main
+    ports:
+      - "3000:3000"
+    volumes:
+      - open-webui-data:/app/backend/data
+    environment:
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+    restart: unless-stopped
+
+volumes:
+  open-webui-data:
+```
+
+Then run:
 ```bash
-git clone https://github.com/open-webui/open-webui
-cd open-webui
 docker compose up -d
 ```
 Visit: `http://localhost:3000`
@@ -129,9 +147,9 @@ def search(query):
 ---
 
 ## 📦 Roadmap
-- [ ] Add Dockerfile for Python + LangChain tools
-- [ ] Add WebUI presets for DocQA and ImageQA
-- [ ] Bundle setup into single `docker-compose.yml`
+- [x] Add Dockerfile for Python + LangChain tools
+- [x] Add WebUI presets for DocQA and ImageQA
+- [x] Bundle setup into single `docker-compose.yml`
 
 ---
 
