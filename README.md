@@ -1,6 +1,6 @@
 # 🧠 Private GPT-Like Assistant (Self-Hosted LLM Stack)
 
-This repo outlines how to set up a private, GPT-style assistant on your **personal machine**, capable of processing **documents**, **images**, and performing **web lookups**, all while ensuring **data privacy**.
+This repo outlines how to set up a private, GPT-style assistant on your **personal machine**, capable of processing **documents**, **images**, generating visual content using Stable Diffusion, and performing **web lookups**, all while ensuring **data privacy**.
 
 ---
 
@@ -19,9 +19,10 @@ This repo outlines how to set up a private, GPT-style assistant on your **person
 |----------------------|----------------------------------------|
 | **LLM Host**         | [Ollama](https://ollama.com)           |
 | **Chat UI**          | [Open WebUI](https://github.com/open-webui/open-webui) |
-| **Document Parsing** | PyMuPDF, LangChain                     |
+| **Document Parsing** | PyMuPDF, python-docx, pandas           |
 | **Image Support**    | LLaVA via Ollama or BLIP2              |
 | **Web Lookups**      | Tavily API or SerpAPI + requests       |
+| **Image Generation** | Stable Diffusion + FastAPI (custom)    |
 | **Remote Access**    | Tailscale                              |
 
 ---
@@ -63,13 +64,22 @@ Create a `docker-compose.yml` file:
 version: "3"
 services:
   webui:
-    image: ghcr.io/open-webui/open-webui:main
+    image: ghcr.io/open-webui/open-webui:latest
     ports:
-      - "3000:3000"
+      - "3000:8080"
     volumes:
       - open-webui-data:/app/backend/data
     environment:
       - OLLAMA_BASE_URL=http://host.docker.internal:11434
+      - WEBUI_HOST=0.0.0.0
+    restart: unless-stopped
+
+  sd-api:
+    build: ./sd-api
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./outputs:/app/outputs
     restart: unless-stopped
 
 volumes:
@@ -84,27 +94,19 @@ Visit: `http://localhost:3000`
 
 ---
 
-## 🧠 Document Question Answering
+## 🧠 Document + Excel Summarization Tool
 
 Install dependencies:
 ```bash
-pip install langchain pymupdf
+pip install langchain pymupdf python-docx pandas openpyxl
 ```
 
-Example script:
-```python
-from langchain.document_loaders import PyMuPDFLoader
-from langchain.chains.question_answering import load_qa_chain
-from langchain.llms import Ollama
+Python script (CLI or FastAPI-based) parses:
+- PDFs via `PyMuPDF`
+- Word files via `python-docx`
+- Excel files via `pandas`
 
-loader = PyMuPDFLoader("./docs/sample.pdf")
-docs = loader.load()
-
-llm = Ollama(model="mistral")
-chain = load_qa_chain(llm, chain_type="stuff")
-result = chain.run(docs, question="Summarize this document.")
-print(result)
-```
+Use LangChain to summarize extracted content via Ollama's API.
 
 ---
 
@@ -112,44 +114,49 @@ print(result)
 ```bash
 ollama run llava
 ```
-Then in Open WebUI or API, send an image + prompt for description or analysis.
+Use image prompts inside WebUI to analyze and describe images.
+
+---
+
+## 🎨 Image Generation with Stable Diffusion
+Use included container `sd-api`:
+- Hosted on `localhost:5000`
+- Accepts POST request with `{ "prompt": "..." }`
+- Generates an image using Stable Diffusion and saves to `/app/outputs`
+
+Example request:
+```bash
+curl -X POST http://localhost:5000/generate -H "Content-Type: application/json" -d '{"prompt":"a cyberpunk city at night"}'
+```
+
+Returns path or base64 image URL.
 
 ---
 
 ## 🌐 Web Lookup Integration
-Example using Tavily API:
-```python
-import requests
-
-def search(query):
-    url = f"https://api.tavily.com/search?q={query}&api_key=YOUR_KEY"
-    response = requests.get(url)
-    return response.json()['answer']
-```
+Use Tavily or SerpAPI in a Python or LangChain wrapper to enrich answers when internet access is needed.
 
 ---
 
 ## 🔒 Remote Access with Tailscale
 - [Install Tailscale](https://tailscale.com/download)
-- Login and connect your work machine and home PC
-- Access Open WebUI via `http://<tailscale-ip>:3000`
-- Access Ollama API via `http://<tailscale-ip>:11434`
+- Log into the same account on your PC + work laptop or phone
+- Use `http://<tailscale-ip>:3000` from any device
 
 ---
 
-## 🛠️ Optional Enhancements
-
-- Whisper (speech-to-text)
-- Text-to-speech readbacks
-- ChromaDB + LangChain RAG
-- CrewAI or AutoGen for agent workflows
+## 📱 Mobile Access
+- Install Tailscale on iOS/Android
+- Add `http://<tailscale-ip>:3000` to your home screen (Safari/Chrome "Add to Home Screen")
 
 ---
 
 ## 📦 Roadmap
 - [x] Add Dockerfile for Python + LangChain tools
 - [x] Add WebUI presets for DocQA and ImageQA
-- [x] Bundle setup into single `docker-compose.yml`
+- [x] Bundle Stable Diffusion as second container
+- [ ] Add UI buttons to call SD and doc parser directly
+- [ ] Add voice-to-text via Whisper
 
 ---
 
